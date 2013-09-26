@@ -92,13 +92,14 @@ for ichn in options.channel.split():
     dict[ichn] = list
     list_all.extend(list)
 
-    print fmt % (ichn, ':', str(len(dict[ichn])) + ' files are found')
+#    print fmt % (ichn, ':', str(len(dict[ichn])) + ' files are found')
 
 
     
-print sep_line
-print fmt % ('Combined', ':', len(list_all))
-print sep_line
+#print sep_line
+print
+print fmt % ('Total # of files', ':', len(list_all))
+#print sep_line
 
 
 # Individual channel
