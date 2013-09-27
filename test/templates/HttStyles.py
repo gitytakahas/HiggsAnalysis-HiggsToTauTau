@@ -7,7 +7,9 @@ from ROOT import TStyle, kBlack, kFALSE
 
 
 HttStyle = TStyle("Htt-Style","The Perfect Style for Plots -)")
-gStyle = HttStyle
+#gStyle = HttStyle
+HttStyle.cd()
+
 
 # Canvas
 HttStyle.SetCanvasColor     (0)

@@ -14,34 +14,12 @@
 #   --it relies on another macro sobWeightedCombine.py being at the same PATH
 #
 
-
 sep_line = '-'*70
 fmt = '%-20s %-4s %-10s'
 
-from ROOT import gROOT
-from HttStyles import *
-#from sobWeightedCombine.py import *
+import sys
 from optparse import OptionParser, OptionGroup
 import ConfigParser
-
-
-parser = OptionParser(usage='usage: %prog [options] ARGs',
-                      description='S/B plot macro')
-parser.add_option('-c', '--channel', dest='channel', default='mt et tt em ee mm mt_soft vhtt', action='store',
-                  help='channels to be considered for the plot. Default : mt et tt em ee mm mt_soft vhtt')
-
-parser.add_option('-p', '--period', dest='period', default='7TeV 8TeV', action='store',
-                  help='period used for the S/B plots. Default : 7TeV 8TeV')
-
-parser.add_option('-g', '--category', dest='category', default='0jet 1jet vbf', action='store',
-                  help='categories used for the S/B plots. Default : 0jet 1jet vbf')
-
-
-(options, args) = parser.parse_args()
-
-init = ConfigParser.SafeConfigParser()
-init.read('./config.ini')
-
 
 def sobCombine(Plotname, # TauTau_MSSM
                ListOfHistogram, # TauTau_MSSM
@@ -72,44 +50,68 @@ def sobCombine(Plotname, # TauTau_MSSM
     print fmt % ('# of files', ':', len(ListOfHistogram))
     print
 
+    from sobWeightedCombine import *
     
-#    sobWeightedCombine(ListOfHistogram, Plotname, Weight, muValue);  
-#    sobWeightedPlot(Plotname, Datasetname, Channelname, Categoryname, Log, Mass, Tanb)
+    # sobWeightedCombine(ListOfHistogram, Plotname, Weight, float(muValue))
+    # sobWeightedPlot(Plotname, str(Datasetname), str(Channelname), str(Categoryname), Log, Mass, Tanb)
+    sobInputs(ListOfHistogram, Plotname + 'SOB', float(muValue))
+    sobWeightedPlot(Plotname + 'SOB', str(Datasetname), str(Channelname), str(Categoryname), True, Mass, Tanb, True)
     
 
-dict = {}
-list_all = []
+def main():
+
+    parser = OptionParser(usage='usage: %prog [options] ARGs',
+                          description='S/B plot macro')
+    parser.add_option('-c', '--channel', dest='channel', default='mt et tt em ee mm mt_soft vhtt', action='store',
+                      help='channels to be considered for the plot. Default : mt et tt em ee mm mt_soft vhtt')
+
+    parser.add_option('-p', '--period', dest='period', default='7TeV 8TeV', action='store',
+                      help='period used for the S/B plots. Default : 7TeV 8TeV')
+
+    parser.add_option('-g', '--category', dest='category', default='0jet 1jet vbf', action='store',
+                      help='categories used for the S/B plots. Default : 0jet 1jet vbf')
+
+    (options, args) = parser.parse_args()
+
+    init = ConfigParser.SafeConfigParser()
+    init.read('./config.ini')
+
+    dict = {}
+    list_all = []
 
 
-for ichn in options.channel.split():
+    for ichn in options.channel.split():
 
-    list = []
-    
-    for icat in options.category.split():
-        for iperiod in options.period.split():
-            list.extend(init.get(ichn, icat+'_'+iperiod).split())
+        list = []
+        
+        for icat in options.category.split():
+            for iperiod in options.period.split():
+                list.extend(init.get(ichn, icat+'_'+iperiod).split())
 
-    dict[ichn] = list
-    list_all.extend(list)
+        dict[ichn] = list
+        list_all.extend(list)
 
-#    print fmt % (ichn, ':', str(len(dict[ichn])) + ' files are found')
-
-
-    
-#print sep_line
-print
-print fmt % ('Total # of files', ':', len(list_all))
-#print sep_line
+    #    print fmt % (ichn, ':', str(len(dict[ichn])) + ' files are found')
 
 
-# Individual channel
-for ichn in options.channel.split():
-    pname = ichn + '_SM'
-    sobCombine(pname, dict[ichn], init.get('naming', 'caption'), init.get('naming',ichn), '', 1, init.get('muvalue',ichn))
+        
+    #print sep_line
+    print
+    print fmt % ('Total # of files', ':', len(list_all))
+    #print sep_line
+
+    # Individual channel
+    for ichn in options.channel.split():
+        pname = ichn + '_SM'
+    #    print init.get('naming', 'caption'), init.get('naming',ichn)
+        sobCombine(pname, dict[ichn], init.get('naming', 'caption'), init.get('naming',ichn), '', 1, init.get('muvalue',ichn))
 
 
-# Combine
-sobCombine('All_SM', list_all, init.get('naming', 'caption'), init.get('naming','all'), '', 1, init.get('muvalue','all'))
+    # Combine
+    #init.get('naming', 'caption'), init.get('naming','all')
+    sobCombine('All_SM', list_all, init.get('naming', 'caption'), init.get('naming','all'), '', 1, init.get('muvalue','all'))
+
+if __name__ == '__main__':
+    main()
 
 
-gROOT.ProcessLine(".q");
