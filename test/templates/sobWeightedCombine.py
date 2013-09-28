@@ -7,7 +7,7 @@ from HttStyles import *
 SIGNAL_SCALE = 1.
 
 sep = '-'*70
-wfmt = '%.4f %.1f %-60s'
+wfmt = '%.4f %.2f %-60s'
 
 ''' Creates signal-over-background weighted plots
     from post-fit Inputs. Helper class for 
@@ -144,10 +144,27 @@ class SOBPlotter():
         sig = fSig.Integral(xlow, xhigh)
         bkg = fBkg.Integral(xlow, xhigh)
 
+        bkgErr = 0
+        xlow_bin = hb.FindBin(xlow)
+        xhigh_bin = hb.FindBin(xhigh)
+
+        for ibin in range(xlow_bin, xhigh_bin):
+            bkgErr += hb.GetBinError(ibin)*hb.GetBinError(ibin)
+
+#        bkg2 = hb.IntegralAndError(xlow, xhigh, bkgErr)
+#        bkgString += template.format(binContent=hb.GetBinContent(iBin), binXmin=, binXmax=hb.GetBinLowEdge(iBin)+hb.GetBinWidth(iBin))
+#        print 'yuta :', xlow, xhigh, xlow_bin, xhigh_bin, bkg, '+/-', math.sqrt(bkgErr)
+
+
+
+
+
         print 'Integrals signal, background, around peak', sig, bkg
         
-#        return sig/math.sqrt(sig + bkg)
-        return sig/bkg, sig
+        return sig/math.sqrt(sig + bkg + bkgErr), sig*sig/bkg
+
+#        return sig/bkg, sig*(sig/bkg)
+
 #        return sig/(sig+bkg)
 
         # Can introdduce other measures here:
@@ -182,9 +199,10 @@ class SOBPlotter():
         weights = {}
         Nsig = {}
         weightSum = 0.
+        NsigSum = 0.
         for fileName in fileNames:
             inFile = self.openTFile(fileName+'.root')
-            
+
             ggH = self.tfileCopy(inFile, 'ggH')
 
             if fileName.find('emu') != -1 and isSM:
@@ -193,29 +211,36 @@ class SOBPlotter():
                 Ztt = self.tfileCopy(inFile, 'Ztt')
 
             weights[fileName], Nsig[fileName] = self.getSoB(ggH, Ztt)
-#            print 'Yuta => ', fileName, weights[fileName], Nsig[fileName]
             weightSum += weights[fileName]
+            NsigSum += Nsig[fileName]
 
         if weightSum <= 0.:
             print 'ERROR: sum of S/B weights is bad, returning'
             return
         for fileName in fileNames:
+
             weights[fileName] = weights[fileName]/weightSum
-            Nsig[fileName] = Nsig[fileName]*weights[fileName]
+            Nsig[fileName] = Nsig[fileName]/NsigSum
+            
 #            weights[fileName] = weights[fileName]
 
         maxW = 0.
 
-        # Yuta added
         print
         print sep
         print 'Weight', 'Signal cont.', 'category'
         print sep
+        TotalWeight = 0
+        TotalNsig = 0
         for k, v in sorted(weights.items(), key=lambda x:x[1], reverse=True):
             print wfmt % (v, Nsig[k], k.replace('postfit_','').replace('_LIN','').replace('_LOG',''))
+            TotalWeight += v
+            TotalNsig += Nsig[k]
+        print sep
+        print TotalWeight, TotalNsig
         print sep
         print
-        # Yuta added
+
         
         for fileName in fileNames:
             if weights[fileName] > maxW:
@@ -273,11 +298,15 @@ class SOBPlotter():
         for fileName in fileNames:
             weights[fileName] *= signalIntegral/weightedSignalIntegral
 
+        
         samples = ['ggH', 'Ztt', 'signal', 'data_obs', 'ttbar', 'EWK', 'Fakes']
 
         fN0 = fileNames[0]
+        print 'Yuta1', fN0
         if fN0.find('emu') != -1 and isSM:
             samples.append('ggH_hww')
+        if fN0.find('eleTau') != -1 and isSM:
+            samples.append('Zee')
 
         file1 = self.openTFile(fN0+'.root')
 
@@ -319,6 +348,7 @@ class SOBPlotter():
                 if sample == 'signal':
                     localHistDict[sample].Add(localHistDict['Ztt'], -1.)
                     localHistDict[sample].Scale(SIGNAL_SCALE)
+#                print 'Add here ... ', sample, histDict[sample], localHistDict[sample]
                 histDict[sample].Add(localHistDict[sample])
                 if fileName.find('emu') == -1 and 'ggH_hww' in histDict and sample == 'Ztt':
                     histDict['ggH_hww'].Add(localHistDict[sample])
@@ -338,10 +368,14 @@ class SOBPlotter():
         
 
         fN0 = fileNames[0]
-        isEMSM = fN0.find('emu_') != -1 and isSM
+        isEMSM = fN0.find('em_') != -1 and isSM
+        isETSM = fN0.find('et_') != -1 and isSM
+        
         samples = ['ggH', 'Ztt', 'signal', 'data_obs', 'ttbar', 'EWK', 'Fakes']
         if isEMSM:
             samples.append('ggH_hww')
+        if isETSM:
+            samples.append('Zee')
 
         file1 = self.openTFile(fN0+'.root')
 
@@ -371,6 +405,8 @@ class SOBPlotter():
             localHistDict = {}
             for sample in samples:
                 if not isEMSM and sample == 'ggH_hww':
+                    continue
+                if not isETSM and sample == 'Zee':
                     continue
                 if sample == 'signal':
                     localHistDict[sample] = self.tfileCopy(file2, 'ggH', sample+fileName)
@@ -525,17 +561,21 @@ class SOBPlotter():
         if log: c.SetLogy(1)
 
         f = self.openTFile('Plot_'+fileName+'.root')
-        
+
         isEMSM = fileName.find('SM') != -1 and fileName.find('em') != -1
+        isETSM = fileName.find('SM') != -1 and fileName.find('et') != -1
 
         samples = ['ggH', 'Ztt', 'signal', 'data_obs', 'ttbar', 'EWK', 'Fakes']
 
         if isEMSM:
             samples.append('ggH_hww')
+        if isETSM:
+            samples.append('Zee')
 
         histDict = {}
         for sample in samples:
             histDict[sample] = self.tfileGet(f, sample)
+            print 'check :', sample, histDict[sample].GetSumOfWeights()
             if not histDict[sample]:
                 print 'Missing histogram', sample, 'in file', 'Plot_'+fileName+'.root'
 
@@ -562,9 +602,15 @@ class SOBPlotter():
                 data.SetBinContent(i, data_obs.GetBinContent(i))
                 # print data.GetBinContent(i)
 
+        ggH_hww = 0
+        zee = 0
+
         signal = histDict['signal']
         if isEMSM:
             ggH_hww = histDict['ggH_hww']
+        if isETSM:
+            print 'retrieve Zee'
+            zee = histDict['Zee']
         tt = histDict['ttbar']
         ewk = histDict['EWK']
         fakes = histDict['Fakes']
@@ -640,6 +686,8 @@ class SOBPlotter():
             legend.AddEntry(ggH_hww, "H(125 GeV)#rightarrowWW", "F")
         legend.AddEntry(ztt, "Z#rightarrow#tau#tau","F")
         legend.AddEntry(tt, "t#bar{t}","F")
+        if isETSM:
+            legend.AddEntry(zee, "Z#rightarrowee", "F")
         legend.AddEntry(ewk, "electroweak","F")
         legend.AddEntry(fakes, "QCD","F")
 
@@ -729,8 +777,12 @@ class SOBPlotter():
         ztt.Draw("hist same")
         errorBand.Draw("e2 same")
         tt.Draw("hist same")
+        if isETSM:
+            zee.Draw("hist same")
         ewk.Draw("hist same")
         fakes.Draw("hist same")
+
+
         data.Draw("pe same")
         print '#####', data.Integral(), data.GetBinContent(1)
         legend.Draw()

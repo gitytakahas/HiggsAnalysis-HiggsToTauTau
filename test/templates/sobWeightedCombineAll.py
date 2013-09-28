@@ -21,6 +21,7 @@ import sys
 from optparse import OptionParser, OptionGroup
 import ConfigParser
 from sobWeightedCombine import *
+from ROOT import gROOT
 
 def sobCombine(Plotname, # TauTau_MSSM
                ListOfHistogram, # TauTau_MSSM
@@ -79,8 +80,15 @@ def main():
 
     parser.add_option('-m', '--mode', dest='mode', default='Mtt', action='store',
                       help='Plot mode. You can choose Mtt, SOB, Default : Mtt')
-    
+
+    parser.add_option("-b", "--batch", dest='batch', action="store_true", default=True,
+                      help='Set Batch mode. Default : False')
+
     (options, args) = parser.parse_args()
+
+
+    if(options.batch==True):
+        gROOT.SetBatch(True)
 
     init = ConfigParser.SafeConfigParser()
     init.read('./config.ini')
@@ -100,30 +108,27 @@ def main():
         dict[ichn] = list
         list_all.extend(list)
 
-    #    print fmt % (ichn, ':', str(len(dict[ichn])) + ' files are found')
-
-
-        
-    #print sep_line
     print
     print fmt % ('Total # of files', ':', len(list_all))
-    #print sep_line
 
-    categoryname = 'All category'
+    categoryname = 'All_category'
     if options.category != '0jet 1jet vbf':
         categoryname = options.category
 
     # Individual channel
     for ichn in options.channel.split():
         pname = ichn + '_SM'
-    #    print init.get('naming', 'caption'), init.get('naming',ichn)
 
         sobCombine(pname, dict[ichn], init.get('naming', 'caption'), init.get('naming',ichn), categoryname, 1, init.get('muvalue',ichn), options.mode)
 
 
     # Combine
-    #init.get('naming', 'caption'), init.get('naming','all')
-    sobCombine('All_SM', list_all, init.get('naming', 'caption'), init.get('naming','all'), categoryname, 1, init.get('muvalue','all'), options.mode)
+#    sobCombine('All_SM', list_all, init.get('naming', 'caption'), init.get('naming','all'), categoryname, 1, init.get('muvalue','all'), options.mode)
+
+
+
+
+
 
 if __name__ == '__main__':
     main()
