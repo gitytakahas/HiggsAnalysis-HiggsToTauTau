@@ -20,6 +20,7 @@ fmt = '%-20s %-4s %-10s'
 import sys
 from optparse import OptionParser, OptionGroup
 import ConfigParser
+from sobWeightedCombine import *
 
 def sobCombine(Plotname, # TauTau_MSSM
                ListOfHistogram, # TauTau_MSSM
@@ -28,6 +29,7 @@ def sobCombine(Plotname, # TauTau_MSSM
                Categoryname, # 
                Weight,
                muValue,
+               Mode,
                Log=False,
                Mass=125,
                Tanb=0):
@@ -44,25 +46,29 @@ def sobCombine(Plotname, # TauTau_MSSM
     print fmt % ('Categoryname', ':', Categoryname)
     print fmt % ('Weight', ':', Weight)
     print fmt % ('mu-Value', ':', muValue)
+    print fmt % ('Plot mode', ':', Mode)
     print fmt % ('Log-scale', ':', Log)
     print fmt % ('Mass', ':', Mass)
     print fmt % ('tan-beta', ':', Tanb)
     print fmt % ('# of files', ':', len(ListOfHistogram))
     print
 
-    from sobWeightedCombine import *
     
-    # sobWeightedCombine(ListOfHistogram, Plotname, Weight, float(muValue))
-    # sobWeightedPlot(Plotname, str(Datasetname), str(Channelname), str(Categoryname), Log, Mass, Tanb)
-    sobInputs(ListOfHistogram, Plotname + 'SOB', float(muValue))
-    sobWeightedPlot(Plotname + 'SOB', str(Datasetname), str(Channelname), str(Categoryname), True, Mass, Tanb, True)
     
+    if Mode=='Mtt':
+        sobWeightedCombine(ListOfHistogram, Plotname, Weight, float(muValue))
+        sobWeightedPlot(Plotname, str(Datasetname), str(Channelname), str(Categoryname), Log, Mass, Tanb)
+    elif Mode=='SOB':
+        sobInputs(ListOfHistogram, Plotname + 'SOB', float(muValue))
+        sobWeightedPlot(Plotname + 'SOB', str(Datasetname), str(Channelname), str(Categoryname), True, Mass, Tanb, True)
+    else:
+        print 'Choose the mode from Mtt, SOB'
 
 def main():
 
     parser = OptionParser(usage='usage: %prog [options] ARGs',
                           description='S/B plot macro')
-    parser.add_option('-c', '--channel', dest='channel', default='mt et tt em ee mm mt_soft vhtt', action='store',
+    parser.add_option('-c', '--channel', dest='channel', default='mt et tt em', action='store',
                       help='channels to be considered for the plot. Default : mt et tt em ee mm mt_soft vhtt')
 
     parser.add_option('-p', '--period', dest='period', default='7TeV 8TeV', action='store',
@@ -71,6 +77,9 @@ def main():
     parser.add_option('-g', '--category', dest='category', default='0jet 1jet vbf', action='store',
                       help='categories used for the S/B plots. Default : 0jet 1jet vbf')
 
+    parser.add_option('-m', '--mode', dest='mode', default='Mtt', action='store',
+                      help='Plot mode. You can choose Mtt, SOB, Default : Mtt')
+    
     (options, args) = parser.parse_args()
 
     init = ConfigParser.SafeConfigParser()
@@ -100,16 +109,21 @@ def main():
     print fmt % ('Total # of files', ':', len(list_all))
     #print sep_line
 
+    categoryname = 'All category'
+    if options.category != '0jet 1jet vbf':
+        categoryname = options.category
+
     # Individual channel
     for ichn in options.channel.split():
         pname = ichn + '_SM'
     #    print init.get('naming', 'caption'), init.get('naming',ichn)
-        sobCombine(pname, dict[ichn], init.get('naming', 'caption'), init.get('naming',ichn), '', 1, init.get('muvalue',ichn))
+
+        sobCombine(pname, dict[ichn], init.get('naming', 'caption'), init.get('naming',ichn), categoryname, 1, init.get('muvalue',ichn), options.mode)
 
 
     # Combine
     #init.get('naming', 'caption'), init.get('naming','all')
-    sobCombine('All_SM', list_all, init.get('naming', 'caption'), init.get('naming','all'), '', 1, init.get('muvalue','all'))
+    sobCombine('All_SM', list_all, init.get('naming', 'caption'), init.get('naming','all'), categoryname, 1, init.get('muvalue','all'), options.mode)
 
 if __name__ == '__main__':
     main()

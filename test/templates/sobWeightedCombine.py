@@ -145,9 +145,10 @@ class SOBPlotter():
         bkg = fBkg.Integral(xlow, xhigh)
 
         print 'Integrals signal, background, around peak', sig, bkg
-
+        
+        return sig/math.sqrt(sig + bkg)
 #        return sig/bkg
-        return sig/(sig+bkg)
+#        return sig/(sig+bkg)
 
         # Can introdduce other measures here:
         # sig/sqrt(sig+bkg)
@@ -198,6 +199,7 @@ class SOBPlotter():
             return
         for fileName in fileNames:
             weights[fileName] = weights[fileName]/weightSum
+#            weights[fileName] = weights[fileName]
 
         maxW = 0.
 
@@ -534,8 +536,10 @@ class SOBPlotter():
             if not histDict[sample]:
                 print 'Missing histogram', sample, 'in file', 'Plot_'+fileName+'.root'
 
-        xminInset = 60 # 0
-        xmaxInset = 180 # 340 (for full range)
+#        xminInset = 60 # 0
+#        xmaxInset = 180 # 340 (for full range)
+        xminInset = 40 # 0
+        xmaxInset = 200 # 340 (for full range)
 
         if tanb > 0:
             xminInset = mass - 100
@@ -732,9 +736,17 @@ class SOBPlotter():
         pad.Draw()
         if log: c.SetLogy(1)
         self.CMSPrelim(c, datasetName, channel, cat)
-        c.Print('Plot_'+fileName+".eps")
-        c.Print('Plot_'+fileName+".png")
-        c.Print('Plot_'+fileName+".pdf")
+
+        savepath = 'figure/Plot_'+fileName
+        if cat=='':
+            savepath = savepath + '.png'
+        else:
+            savepath = savepath + '_' + cat + '.png'
+
+#        c.Print('figure/Plot_'+fileName+".eps")
+#        c.Print('figure/Plot_'+fileName+".png")
+#        c.Print('figure/Plot_'+fileName+".pdf")
+        c.Print(savepath)
         c.Close()
  
 
