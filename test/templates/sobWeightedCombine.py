@@ -7,7 +7,7 @@ from HttStyles import *
 SIGNAL_SCALE = 1.
 
 sep = '-'*70
-wfmt = '%.4f %-40s'
+wfmt = '%.4f %.1f %-60s'
 
 ''' Creates signal-over-background weighted plots
     from post-fit Inputs. Helper class for 
@@ -146,8 +146,8 @@ class SOBPlotter():
 
         print 'Integrals signal, background, around peak', sig, bkg
         
-        return sig/math.sqrt(sig + bkg)
-#        return sig/bkg
+#        return sig/math.sqrt(sig + bkg)
+        return sig/bkg, sig
 #        return sig/(sig+bkg)
 
         # Can introdduce other measures here:
@@ -180,6 +180,7 @@ class SOBPlotter():
 
     def getSOBWeights(self, fileNames, isSM):
         weights = {}
+        Nsig = {}
         weightSum = 0.
         for fileName in fileNames:
             inFile = self.openTFile(fileName+'.root')
@@ -191,7 +192,8 @@ class SOBPlotter():
             else:
                 Ztt = self.tfileCopy(inFile, 'Ztt')
 
-            weights[fileName] = self.getSoB(ggH, Ztt)
+            weights[fileName], Nsig[fileName] = self.getSoB(ggH, Ztt)
+#            print 'Yuta => ', fileName, weights[fileName], Nsig[fileName]
             weightSum += weights[fileName]
 
         if weightSum <= 0.:
@@ -199,6 +201,7 @@ class SOBPlotter():
             return
         for fileName in fileNames:
             weights[fileName] = weights[fileName]/weightSum
+            Nsig[fileName] = Nsig[fileName]*weights[fileName]
 #            weights[fileName] = weights[fileName]
 
         maxW = 0.
@@ -206,10 +209,10 @@ class SOBPlotter():
         # Yuta added
         print
         print sep
-        print 'weight', 'category'
+        print 'Weight', 'Signal cont.', 'category'
         print sep
         for k, v in sorted(weights.items(), key=lambda x:x[1], reverse=True):
-            print wfmt % (v,k)
+            print wfmt % (v, Nsig[k], k.replace('postfit_','').replace('_LIN','').replace('_LOG',''))
         print sep
         print
         # Yuta added
