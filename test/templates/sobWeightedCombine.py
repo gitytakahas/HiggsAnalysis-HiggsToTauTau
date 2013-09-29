@@ -63,6 +63,20 @@ class SOBPlotter():
                 bin = iBin
         return bin
 
+
+    '''Scale the histogram in bbb way, given the weighting list'''
+    def HistScaling(self, h, wlist):
+
+        if h.GetXaxis().GetNbins() != len(wlist):
+            print '!!! Not the same # of bins !!!', h.GetXaxis().GetNbins(), len(wlist)
+            
+        for ibin in range(1, h.GetXaxis().GetNbins()+1):
+            val = h.GetBinContent(ibin)*wlist[ibin-1]
+            err = h.GetBinError(ibin)*wlist[ibin-1]
+            h.SetBinContent(ibin, val)
+            h.SetBinError(ibin, err)
+
+
     '''Returns first bin with bin content of at least frac times the maximum'''
     def findLastBin(self, h, frac=0.1):
         maxVal = h.GetMaximum()
@@ -161,15 +175,18 @@ class SOBPlotter():
 
         print 'Integrals signal, background, around peak', sig, bkg
         
-        return sig/math.sqrt(sig + bkg + bkgErr), sig*sig/bkg
+#        return sig/math.sqrt(sig + bkg + bkgErr), sig*sig/bkg
 
-#        return sig/bkg, sig*(sig/bkg)
+        return sig/bkg, sig*(sig/bkg)
 
 #        return sig/(sig+bkg)
 
         # Can introdduce other measures here:
         # sig/sqrt(sig+bkg)
         # sig/sqrt(bkgerr*bkgerr + sig + bkg)
+
+
+
 
 
     # This scans through all files, gets the width of 
@@ -250,6 +267,62 @@ class SOBPlotter():
 
         return weights, weightSum
 
+
+
+
+    def getbbbSOBWeights(self, fileNames, isSM):
+        weights = {}
+        weightSum = 0.
+
+        for fileName in fileNames:
+            inFile = self.openTFile(fileName+'.root')
+
+
+            ggH = self.tfileCopy(inFile, 'ggH')
+
+            if fileName.find('emu') != -1 and isSM:
+                Ztt = self.tfileCopy(inFile, 'ggH_hww')
+            else:
+                Ztt = self.tfileCopy(inFile, 'Ztt')
+
+#            print 'check', fileName, ggH, Ztt
+
+            list_sig = []
+            for ibin in range(1,ggH.GetXaxis().GetNbins()+1):
+                sig = ggH.GetBinContent(ibin)
+                bkg = Ztt.GetBinContent(ibin)
+                bkgerr = Ztt.GetBinError(ibin)
+
+                significance=0
+                if not (sig==0 and bkg==0 and bkgerr==0):
+#                    print 'check:', sig, bkg, bkgerr*bkgerr, math.sqrt(sig + bkg + bkgerr*bkgerr)
+                    significance = math.fabs(sig)/math.sqrt(math.fabs(sig) + math.fabs(bkg) + bkgerr*bkgerr)
+
+                list_sig.append(significance)
+                weightSum += significance
+#                print fileName, ibin, significance
+
+            weights[fileName] = list_sig
+
+        print 'Sum of Significanec = ', weightSum
+
+        if weightSum <= 0.:
+            print 'ERROR: sum of S/B weights is bad, returning'
+            return
+
+
+        for fileName in fileNames:
+            significance_list = weights[fileName]
+            new_significance_list = [0 for ii in range(len(significance_list))]
+            for index in range(len(significance_list)):
+                val = significance_list[index]/weightSum
+                new_significance_list[index] = val
+
+        return weights, weightSum
+
+
+
+
     def calculateSignalIntegrals(self, fileNames, weights, muValue, doWeight, isSM):
         signalIntegral = 0.
         weightedSignalIntegral = 0.
@@ -284,6 +357,59 @@ class SOBPlotter():
 
         return signalIntegral, weightedSignalIntegral
 
+
+
+
+    def calculateSignalIntegralsbbb(self, fileNames, weights, muValue, doWeight, isSM):
+        signalIntegral = 0.
+        weightedSignalIntegral = 0.
+
+        for fileName in fileNames:
+            tfile = self.openTFile(fileName+'.root')
+            
+            ggH = tfile.Get('ggH')
+            if fileName.find('emu') != -1 and isSM:
+                Ztt = self.tfileCopy(tfile, 'ggH_hww')
+            else:
+                Ztt = self.tfileCopy(tfile, 'Ztt')
+
+            signal = TH1F(ggH)
+            signal.SetName('signal')
+            signal.Add(Ztt, -1.)
+            signal.Scale(SIGNAL_SCALE * muValue)
+
+            for b in range(1, signal.GetNbinsX()+1):
+                signal.SetBinContent(b, signal.GetBinContent(b) * signal.GetBinWidth(b))
+
+            signalIntegral += signal.Integral()
+
+            if doWeight == 1:
+
+                if signal.GetXaxis().GetNbins() != len(weights[fileName]):
+                    print 'Not the same contents !'
+
+                weight_list = weights[fileName]                
+
+                self.HistScaling(signal, weight_list)
+#                for ibin in range(1, signal.GetXaxis().GetNbins()+1):
+#                    val = signal.GetBinContent(ibin)*weight_list[ibin-1]
+#                    err = signal.GetBinError(ibin)*weight_list[ibin-1]
+#                    signal.SetBinContent(ibin, val)#Scale(weights[fileName])
+#                    signal.SetBinError(ibin, err)#Scale(weights[fileName])
+#                    print ibin, weight_list[ibin-1], val, err
+
+            weightedSignalIntegral += signal.Integral()
+
+        print 'Signal yield:', signalIntegral
+        print 'Weighted signal yield:', weightedSignalIntegral
+        print 'Signal yield scale factor', signalIntegral/weightedSignalIntegral
+
+        return signalIntegral, weightedSignalIntegral
+
+
+
+
+
     def sobWeightedCombine(self, fileNames, outName, doWeight=1, muValue=1.):
         print 'WARNING: using fitted mu value', muValue, 'make sure it\'s up to date'
         isSM = outName.find('SM') != -1
@@ -302,14 +428,14 @@ class SOBPlotter():
         samples = ['ggH', 'Ztt', 'signal', 'data_obs', 'ttbar', 'EWK', 'Fakes']
 
         fN0 = fileNames[0]
-        print 'Yuta1', fN0
+#        print 'Yuta1', fN0
         if fN0.find('emu') != -1 and isSM:
             samples.append('ggH_hww')
         if fN0.find('eleTau') != -1 and isSM:
             samples.append('Zee')
 
         file1 = self.openTFile(fN0+'.root')
-
+        
         histDict = {}
         # Use first file clones as base histograms
 
@@ -368,8 +494,8 @@ class SOBPlotter():
         
 
         fN0 = fileNames[0]
-        isEMSM = fN0.find('em_') != -1 and isSM
-        isETSM = fN0.find('et_') != -1 and isSM
+        isEMSM = fN0.find('emu_') != -1 and isSM
+        isETSM = fN0.find('eleTau_') != -1 and isSM
         
         samples = ['ggH', 'Ztt', 'signal', 'data_obs', 'ttbar', 'EWK', 'Fakes']
         if isEMSM:
@@ -423,9 +549,9 @@ class SOBPlotter():
 
             for iBin in range(1, tmpSignal.GetNbinsX()+2):
                 # Determine bin to fill
+
                 sob = tmpSignal.GetBinContent(iBin)/(tmpBG.GetBinContent(iBin) + tmpSignal.GetBinContent(iBin)) if tmpSignal.GetBinContent(iBin) > 0. else -1.
 
-                if sob > XMAX: print 'Large S/B', sob, fileName
 
                 # Fill bin
                 for sample in samples:
@@ -455,6 +581,99 @@ class SOBPlotter():
 
         outFile.ls()
         outFile.Close()
+
+
+
+####################### YUTA added
+    def bbbsobWeightedCombine(self, fileNames, outName, doWeight=1, muValue=1.):
+        
+        print 'WARNING: using fitted mu value', muValue, 'make sure it\'s up to date'
+        isSM = outName.find('SM') != -1
+
+        rebinDict = {}
+        self.findRebin(fileNames, rebinDict)
+
+        weights, weightSum = self.getbbbSOBWeights(fileNames, isSM)
+
+        signalIntegral, weightedSignalIntegral = self.calculateSignalIntegralsbbb(fileNames, weights, muValue, doWeight, isSM)
+
+
+        for fileName in fileNames:
+#            print 'before weight', weights[fileName]
+            wlist = weights[fileName]
+            for index in range(len(wlist)):
+#                print '\t beore',index, wlist[index]
+                wlist[index] *= signalIntegral/weightedSignalIntegral
+#                print '\t after',index, wlist[index]
+
+            weights[fileName] = wlist
+#            print 'after weight', weights[fileName]
+            
+        samples = ['ggH', 'Ztt', 'signal', 'data_obs', 'ttbar', 'EWK', 'Fakes']
+
+        fN0 = fileNames[0]
+
+        if fN0.find('emu') != -1 and isSM:
+            samples.append('ggH_hww')
+        if fN0.find('eleTau') != -1 and isSM:
+            samples.append('Zee')
+
+        file1 = self.openTFile(fN0+'.root')
+        print file1
+        
+        histDict = {}
+        # Use first file clones as base histograms
+
+        for sample in samples:
+            if sample == 'signal':
+                histDict[sample] = self.tfileCopy(file1, 'ggH', sample)
+            else:
+                histDict[sample] = self.tfileCopy(file1, sample)
+            if doWeight == 1:
+                self.HistScaling(histDict[sample], weights[fN0])
+
+
+            if rebinDict[fN0]:
+                histDict[sample].Rebin(2)
+            if sample == 'signal':
+                histDict[sample].Add(histDict['Ztt'], -1.)
+                histDict[sample].Scale(SIGNAL_SCALE)
+
+        for fileName in fileNames:
+            if fileName == fileNames[0]: continue
+            file2 = self.openTFile(fileName+'.root')
+            
+            localHistDict = {}
+
+            for sample in samples:
+                if fileName.find('emu') == -1 and sample == 'ggH_hww':
+                    continue
+                if sample == 'signal':
+                    localHistDict[sample] = self.tfileCopy(file2, 'ggH', sample+fileName)
+                else:
+                    localHistDict[sample] = self.tfileCopy(file2, sample, sample+fileName)
+
+                self.HistScaling(localHistDict[sample], weights[fileName])
+#                localHistDict[sample].Scale(weights[fileName])
+
+                if rebinDict[fileName]:
+                    localHistDict[sample].Rebin(2)
+                if sample == 'signal':
+                    localHistDict[sample].Add(localHistDict['Ztt'], -1.)
+                    localHistDict[sample].Scale(SIGNAL_SCALE)
+                histDict[sample].Add(localHistDict[sample])
+                if fileName.find('emu') == -1 and 'ggH_hww' in histDict and sample == 'Ztt':
+                    histDict['ggH_hww'].Add(localHistDict[sample])
+
+        fullOutName = 'Plot_' + outName + '.root'
+        outFile = TFile(fullOutName, 'RECREATE')
+        for hist in histDict.values():
+            hist.Write()
+
+        outFile.ls()
+        outFile.Close()
+
+
 
 
     @staticmethod
@@ -575,7 +794,7 @@ class SOBPlotter():
         histDict = {}
         for sample in samples:
             histDict[sample] = self.tfileGet(f, sample)
-            print 'check :', sample, histDict[sample].GetSumOfWeights()
+#            print 'check :', sample, histDict[sample].GetSumOfWeights()
             if not histDict[sample]:
                 print 'Missing histogram', sample, 'in file', 'Plot_'+fileName+'.root'
 
@@ -583,6 +802,8 @@ class SOBPlotter():
 #        xmaxInset = 180 # 340 (for full range)
         xminInset = 40 # 0
         xmaxInset = 200 # 340 (for full range)
+#        xminInset = 0 # 0
+#        xmaxInset = 250 # 340 (for full range)
 
         if tanb > 0:
             xminInset = mass - 100
@@ -805,6 +1026,7 @@ class SOBPlotter():
         c.Close()
  
 
+
 def sobWeightedCombine(fileNames, outName, doWeight=1, muValue=1.):
     s = SOBPlotter()
     s.sobWeightedCombine(fileNames, outName, doWeight, muValue)
@@ -816,3 +1038,8 @@ def sobWeightedPlot(fileName, datasetName, channel, cat, log, mass, tanb, sob=Fa
 def sobInputs(fileNames, outName, muValue=1.):
     s = SOBPlotter()
     s.sobInputs(fileNames, outName, muValue)
+
+def bbbsobWeightedCombine(fileNames, outName, doWeight=1, muValue=1.):
+    s = SOBPlotter()
+    s.bbbsobWeightedCombine(fileNames, outName, doWeight, muValue)
+

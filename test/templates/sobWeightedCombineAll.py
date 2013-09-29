@@ -62,6 +62,9 @@ def sobCombine(Plotname, # TauTau_MSSM
     elif Mode=='SOB':
         sobInputs(ListOfHistogram, Plotname + 'SOB', float(muValue))
         sobWeightedPlot(Plotname + 'SOB', str(Datasetname), str(Channelname), str(Categoryname), True, Mass, Tanb, True)
+    elif Mode=='SigMtt':
+        bbbsobWeightedCombine(ListOfHistogram, Plotname + 'SigMtt', Weight, float(muValue))
+        sobWeightedPlot(Plotname + 'SigMtt', str(Datasetname), str(Channelname), str(Categoryname), Log, Mass, Tanb)
     else:
         print 'Choose the mode from Mtt, SOB'
 
@@ -78,8 +81,8 @@ def main():
     parser.add_option('-g', '--category', dest='category', default='0jet 1jet vbf', action='store',
                       help='categories used for the S/B plots. Default : 0jet 1jet vbf')
 
-    parser.add_option('-m', '--mode', dest='mode', default='Mtt', action='store',
-                      help='Plot mode. You can choose Mtt, SOB, Default : Mtt')
+    parser.add_option('-m', '--mode', dest='mode', default='SigMtt', action='store',
+                      help='Plot mode. You can choose Mtt, SOB, SigMtt Default : Mtt')
 
     parser.add_option("-b", "--batch", dest='batch', action="store_true", default=True,
                       help='Set Batch mode. Default : False')
