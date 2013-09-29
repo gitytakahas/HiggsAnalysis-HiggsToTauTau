@@ -295,8 +295,9 @@ class SOBPlotter():
 
                 significance=0
                 if not (sig==0 and bkg==0 and bkgerr==0):
-#                    print 'check:', sig, bkg, bkgerr*bkgerr, math.sqrt(sig + bkg + bkgerr*bkgerr)
-                    significance = math.fabs(sig)/math.sqrt(math.fabs(sig) + math.fabs(bkg) + bkgerr*bkgerr)
+#                    print 'yt_check:', sig, bkg, bkgerr*bkgerr, math.sqrt(sig + bkg + bkgerr*bkgerr)
+#                    significance = math.fabs(sig)/math.sqrt(math.fabs(sig) + math.fabs(bkg) + bkgerr*bkgerr)
+                    significance = math.fabs(sig)/math.fabs(bkg)
 
                 list_sig.append(significance)
                 weightSum += significance
