@@ -81,7 +81,7 @@ def main():
     parser.add_option('-g', '--category', dest='category', default='0jet 1jet vbf', action='store',
                       help='categories used for the S/B plots. Default : 0jet 1jet vbf')
 
-    parser.add_option('-m', '--mode', dest='mode', default='SigMtt', action='store',
+    parser.add_option('-m', '--mode', dest='mode', default='Mtt', action='store',
                       help='Plot mode. You can choose Mtt, SOB, SigMtt Default : Mtt')
 
     parser.add_option("-b", "--batch", dest='batch', action="store_true", default=True,
@@ -122,6 +122,7 @@ def main():
     for ichn in options.channel.split():
         pname = ichn + '_SM'
 
+#        sobCombine(pname, dict[ichn], init.get('naming', 'caption'), init.get('naming',ichn), categoryname, 1, init.get('muvalue',ichn), options.mode)
         sobCombine(pname, dict[ichn], init.get('naming', 'caption'), init.get('naming',ichn), categoryname, 1, init.get('muvalue',ichn), options.mode)
 
 
