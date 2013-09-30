@@ -1,5 +1,5 @@
 from ROOT import TROOT, TFile, TString, TPad, TPaveText, TCanvas, TH1F, TLegend, TF1, gROOT, TLine, gStyle
-from ROOT import kBlack
+from ROOT import kBlack, TGraphAsymmErrors, Math, Double
 import math
 
 from HttStyles import *
@@ -8,6 +8,7 @@ SIGNAL_SCALE = 1.
 
 sep = '-'*70
 wfmt = '%.4f %.2f %-60s'
+nfmt = '%.2f'
 
 ''' Creates signal-over-background weighted plots
     from post-fit Inputs. Helper class for 
@@ -62,6 +63,48 @@ class SOBPlotter():
             if h.GetBinContent(iBin) > frac * maxVal:
                 bin = iBin
         return bin
+
+    '''Create TGraphAsymmErrors from input histogram with Poisson errors'''
+    def createTGraphPoisson(self, h, w=1.):
+        self.tfile.cd()
+        g = TGraphAsymmErrors(h)
+        for i in range(0, g.GetN()):
+            y = h.GetBinContent(i+1)
+            binWidth = h.GetBinWidth(i+1)
+
+            # From https://twiki.cern.ch/twiki/bin/view/CMS/PoissonErrorBars
+            alpha = 1. - 0.6827
+            n = int(round(y*binWidth/w)) # Round is necessary due to, well, rounding errors
+            l = Math.gamma_quantile(alpha/2., n, 1.) if n != 0. else 0.
+            u = Math.gamma_quantile_c(alpha, n+1, 1)
+            # print y*binWidth/w, n, y, u, l
+            g.SetPointEYlow(i, (n-l)/binWidth*w)
+            g.SetPointEYhigh(i, (u-n)/binWidth*w)
+
+        return g
+
+
+    '''Add input histogram to graph with Poisson errors. Errors added quadratically'''
+    def addHistToTGraphPoisson(self, h, g, w=1.):
+        for i in range(0, g.GetN()):
+            # shifted by +1, i.e. over/underflow
+            err = h.GetBinError(i+1)
+            y = h.GetBinContent(i+1)
+
+            binWidth = h.GetBinWidth(i+1)
+            
+            # From https://twiki.cern.ch/twiki/bin/view/CMS/PoissonErrorBars
+            alpha = 1. - 0.6827
+            n = int(round(y*binWidth/w)) # Round is necessary due to, well, rounding errors
+            l = Math.gamma_quantile(alpha/2., n, 1.) if n != 0. else 0.
+            u = Math.gamma_quantile_c(alpha, n+1, 1) if n != 0. else 0.
+            g.SetPointEYlow(i, math.sqrt(((n-l)/binWidth*w)**2 + g.GetErrorYlow(i)**2))
+            g.SetPointEYhigh(i, math.sqrt(((u-n)/binWidth*w)**2 + g.GetErrorYhigh(i)**2))
+
+            gx = Double(0.)
+            gy = Double(0.)
+            g.GetPoint(i, gx, gy)
+            g.SetPoint(i, gx, y + gy)
 
 
     '''Scale the histogram in bbb way, given the weighting list'''
@@ -294,10 +337,16 @@ class SOBPlotter():
                 bkgerr = Ztt.GetBinError(ibin)
 
                 significance=0
-                if not (sig==0 and bkg==0 and bkgerr==0):
+                sn = 0
+                if not (sig==0 and bkg==0):
 #                    print 'yt_check:', sig, bkg, bkgerr*bkgerr, math.sqrt(sig + bkg + bkgerr*bkgerr)
-#                    significance = math.fabs(sig)/math.sqrt(math.fabs(sig) + math.fabs(bkg) + bkgerr*bkgerr)
-                    significance = math.fabs(sig)/math.fabs(bkg)
+                    significance = math.fabs(sig)/math.sqrt(math.fabs(sig) + math.fabs(bkg) + bkgerr*bkgerr)
+                    sn = math.fabs(sig)/math.fabs(bkg)
+                    # bbb_yuta
+#                    significance = math.fabs(sig)/math.fabs(bkg)
+
+
+                print fileName.replace('postfit_','').replace('_LIN','').replace('_LOG',''), ': bin=', ibin, 'sig=', nfmt % (sig), 'bkg=', nfmt % (bkg), 's/n=', nfmt % (sn), 'sig=', nfmt % (significance)
 
                 list_sig.append(significance)
                 weightSum += significance
@@ -313,13 +362,19 @@ class SOBPlotter():
 
 
         for fileName in fileNames:
+#            print weights[fileName]
             significance_list = weights[fileName]
             new_significance_list = [0 for ii in range(len(significance_list))]
+
             for index in range(len(significance_list)):
                 val = significance_list[index]/weightSum
                 new_significance_list[index] = val
 
-        return weights, weightSum
+            weights[fileName] = new_significance_list
+ #           print weights[fileName]
+
+#        return weights, weightSum
+        return weights
 
 
 
@@ -438,6 +493,7 @@ class SOBPlotter():
         file1 = self.openTFile(fN0+'.root')
         
         histDict = {}
+        dataGraph = 0
         # Use first file clones as base histograms
 
         for sample in samples:
@@ -452,6 +508,9 @@ class SOBPlotter():
             if sample == 'signal':
                 histDict[sample].Add(histDict['Ztt'], -1.)
                 histDict[sample].Scale(SIGNAL_SCALE)
+            if sample == 'data_obs':
+                dataGraph = self.createTGraphPoisson(histDict[sample], weights[fN0])
+
 
         for fileName in fileNames:
             if fileName == fileNames[0]: continue
@@ -475,15 +534,21 @@ class SOBPlotter():
                 if sample == 'signal':
                     localHistDict[sample].Add(localHistDict['Ztt'], -1.)
                     localHistDict[sample].Scale(SIGNAL_SCALE)
-#                print 'Add here ... ', sample, histDict[sample], localHistDict[sample]
+                if sample == 'data_obs':
+                    print 'ADDING', fileName, sample
+                    self.addHistToTGraphPoisson(localHistDict[sample], dataGraph, weights[fileName])
+                #                print 'Add here ... ', sample, histDict[sample], localHistDict[sample]
                 histDict[sample].Add(localHistDict[sample])
                 if fileName.find('emu') == -1 and 'ggH_hww' in histDict and sample == 'Ztt':
                     histDict['ggH_hww'].Add(localHistDict[sample])
+
 
         fullOutName = 'Plot_' + outName + '.root'
         outFile = TFile(fullOutName, 'RECREATE')
         for hist in histDict.values():
             hist.Write()
+
+        dataGraph.Write()
 
         outFile.ls()
         outFile.Close()
@@ -522,7 +587,7 @@ class SOBPlotter():
             h = histDict[sample]
             h.Reset()
             h.SetBins(NBINS, XMIN, XMAX)
-
+            
         file1.Close()
 
         # Second loop: Over all files, fill S/B-histos
@@ -575,10 +640,14 @@ class SOBPlotter():
                 histDict[sample].SetBinContent(NBINS, histDict[sample].GetBinContent(NBINS) + histDict[sample].GetBinContent(NBINS+1))
                 histDict[sample].SetBinError(NBINS, math.sqrt(histDict[sample].GetBinError(NBINS)**2 + histDict[sample].GetBinContent(NBINS+1)**2))
 
+        dataGraph = self.createTGraphPoisson(histDict['data_obs'])
+
         fullOutName = 'Plot_' + outName + '.root'
         outFile = TFile(fullOutName, 'RECREATE')
         for hist in histDict.values():
             hist.Write()
+
+        dataGraph.Write()
 
         outFile.ls()
         outFile.Close()
@@ -594,7 +663,8 @@ class SOBPlotter():
         rebinDict = {}
         self.findRebin(fileNames, rebinDict)
 
-        weights, weightSum = self.getbbbSOBWeights(fileNames, isSM)
+#        weights, weightSum = self.getbbbSOBWeights(fileNames, isSM)
+        weights = self.getbbbSOBWeights(fileNames, isSM)
 
         signalIntegral, weightedSignalIntegral = self.calculateSignalIntegralsbbb(fileNames, weights, muValue, doWeight, isSM)
 
@@ -620,7 +690,7 @@ class SOBPlotter():
             samples.append('Zee')
 
         file1 = self.openTFile(fN0+'.root')
-        print file1
+#        print file1
         
         histDict = {}
         # Use first file clones as base histograms
@@ -678,7 +748,7 @@ class SOBPlotter():
 
 
     @staticmethod
-    def CMSPrelim(c,dataset, channel, cat):
+    def CMSPrelim(c, dataset, channel, cat):
         
         lowX = 0.16
         lowY = 0.835
@@ -716,6 +786,24 @@ class SOBPlotter():
         c.category.SetTextFont ( font )
         c.category.AddText(cat)
         c.category.Draw()
+
+    def diffGraph(self, g, h, opt):
+        gdiff = TGraphAsymmErrors(g)
+        gdiff.SetName(g.GetName() + h.GetName() + '_diff')
+
+        for i in range(0, gdiff.GetN()):
+            x = Double(0.)
+            y = Double(0.)
+            g.GetPoint(i, x, y)
+            gdiff.SetPoint(i, x, y - h.GetBinContent(i+1))
+
+            
+            if opt == 1: # keep bin errors
+                pass
+            elif opt == 2:
+                gdiff.SetPointEYhigh(i, math.sqrt(g.GetErrorYhigh(i)**2 + h.GetBinError(i+1)**2))
+
+        return gdiff
 
     def diffPlot(self, h1, h2, opt):
         h = TH1F(h1)
@@ -792,6 +880,8 @@ class SOBPlotter():
         if isETSM:
             samples.append('Zee')
 
+        dataGraph = self.tfileGet(f, 'Graph_from_data_obs')
+
         histDict = {}
         for sample in samples:
             histDict[sample] = self.tfileGet(f, sample)
@@ -799,10 +889,10 @@ class SOBPlotter():
             if not histDict[sample]:
                 print 'Missing histogram', sample, 'in file', 'Plot_'+fileName+'.root'
 
-#        xminInset = 60 # 0
-#        xmaxInset = 180 # 340 (for full range)
-        xminInset = 40 # 0
-        xmaxInset = 200 # 340 (for full range)
+        xminInset = 60 # 0
+        xmaxInset = 180 # 340 (for full range)
+#        xminInset = 40 # 0
+#        xmaxInset = 200 # 340 (for full range)
 #        xminInset = 0 # 0
 #        xmaxInset = 250 # 340 (for full range)
 
@@ -816,13 +906,15 @@ class SOBPlotter():
 
         ztt = histDict['Ztt']
         ggH = histDict['ggH']
-        data_obs = histDict['data_obs']
-        data = data_obs
+        data = histDict['data_obs']
+
+        # This is to fix a weird plotting bug
         if sob:
-            data = TH1F('new_data', '', ggH.GetNbinsX(), 0., 0.7)
-            for i in range(1, data.GetNbinsX()+1):
-                data.SetBinContent(i, data_obs.GetBinContent(i))
+            new_data = TH1F('new_data', '', ggH.GetNbinsX(), 0., 0.7)
+            for i in range(1, new_data.GetNbinsX()+1):
+                new_data.SetBinContent(i, data.GetBinContent(i))
                 # print data.GetBinContent(i)
+            data = new_data
 
         ggH_hww = 0
         zee = 0
@@ -928,9 +1020,11 @@ class SOBPlotter():
 
         if isEMSM:
             dataDiff = self.diffPlot(data, ggH_hww, 1)
+            dataDiffGraph = self.diffGraph(dataGraph, ggH_hww, 1)
             errBand=self.getErrorBand(ggH_hww)
         else:
             dataDiff = self.diffPlot(data, ztt, 1)
+            dataDiffGraph = self.diffGraph(dataGraph, ztt, 1)
             errBand=self.getErrorBand(ztt)
 
         errBand.SetFillStyle(3013) # 1001=solid , 3004,3005=diagonal, 3013=hatched official for H.tau tau
@@ -987,7 +1081,8 @@ class SOBPlotter():
         signal.Draw("histsame")
         line = TLine()
         line.DrawLine(xminInset, 0, xmaxInset, 0)
-        dataDiff.Draw("pe same")
+        # dataDiff.Draw("pe same")
+        dataDiffGraph.Draw('pe same')
         legendDiff.Draw()
         pad.RedrawAxis()
 
@@ -1005,7 +1100,8 @@ class SOBPlotter():
         fakes.Draw("hist same")
 
 
-        data.Draw("pe same")
+        # data.Draw("pe same")
+        dataGraph.Draw('PE same')
         print '#####', data.Integral(), data.GetBinContent(1)
         legend.Draw()
         c.RedrawAxis()
