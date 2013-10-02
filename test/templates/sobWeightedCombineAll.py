@@ -31,6 +31,7 @@ def sobCombine(Plotname, # TauTau_MSSM
                Weight,
                muValue,
                Mode,
+               unblind,
                Log=False,
                Mass=125,
                Tanb=0):
@@ -50,6 +51,7 @@ def sobCombine(Plotname, # TauTau_MSSM
     print fmt % ('Plot mode', ':', Mode)
     print fmt % ('Log-scale', ':', Log)
     print fmt % ('Mass', ':', Mass)
+    print fmt % ('Blind', ':', unblind)
     print fmt % ('tan-beta', ':', Tanb)
     print fmt % ('# of files', ':', len(ListOfHistogram))
     print
@@ -58,7 +60,7 @@ def sobCombine(Plotname, # TauTau_MSSM
     
     if Mode=='Mtt':
         sobWeightedCombine(ListOfHistogram, Plotname, Weight, float(muValue))
-        sobWeightedPlot(Plotname, str(Datasetname), str(Channelname), str(Categoryname), Log, Mass, Tanb)
+        sobWeightedPlot(Plotname, str(Datasetname), str(Channelname), str(Categoryname), Log, Mass, Tanb, unblind)
     elif Mode=='SOB':
         sobInputs(ListOfHistogram, Plotname + 'SOB', float(muValue))
         sobWeightedPlot(Plotname + 'SOB', str(Datasetname), str(Channelname), str(Categoryname), True, Mass, Tanb, True)
@@ -86,6 +88,9 @@ def main():
 
     parser.add_option("-b", "--batch", dest='batch', action="store_true", default=True,
                       help='Set Batch mode. Default : False')
+
+    parser.add_option("-u", "--unblind", dest='unblind', action="store_true", default=False,
+                      help='Use this option when unblinding. Default : False')
 
     (options, args) = parser.parse_args()
 
@@ -123,11 +128,11 @@ def main():
         pname = ichn + '_SM'
 
 #        sobCombine(pname, dict[ichn], init.get('naming', 'caption'), init.get('naming',ichn), categoryname, 1, init.get('muvalue',ichn), options.mode)
-        sobCombine(pname, dict[ichn], init.get('naming', 'caption'), init.get('naming',ichn), categoryname, 1, init.get('muvalue',ichn), options.mode)
+        sobCombine(pname, dict[ichn], init.get('naming', 'caption'), init.get('naming',ichn), categoryname, 1, init.get('muvalue',ichn), options.mode, options.unblind)
 
 
     # Combine
-#    sobCombine('All_SM', list_all, init.get('naming', 'caption'), init.get('naming','all'), categoryname, 1, init.get('muvalue','all'), options.mode)
+#    sobCombine('All_SM', list_all, init.get('naming', 'caption'), init.get('naming','all'), categoryname, 1, init.get('muvalue','all'), options.mode, options.unblind)
 
 
 

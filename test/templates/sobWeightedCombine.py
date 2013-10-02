@@ -863,7 +863,7 @@ class SOBPlotter():
 
 
 
-    def sobWeightedPlot(self, fileName, datasetName, channel, cat, log, mass, tanb, sob=False):
+    def sobWeightedPlot(self, fileName, datasetName, channel, cat, log, mass, tanb, blind, sob=False):
         c = TCanvas(fileName, '', 600, 600)
         c.cd()
         if log: c.SetLogy(1)
@@ -889,12 +889,12 @@ class SOBPlotter():
             if not histDict[sample]:
                 print 'Missing histogram', sample, 'in file', 'Plot_'+fileName+'.root'
 
-        xminInset = 60 # 0
-        xmaxInset = 180 # 340 (for full range)
-#        xminInset = 40 # 0
-#        xmaxInset = 200 # 340 (for full range)
-#        xminInset = 0 # 0
-#        xmaxInset = 250 # 340 (for full range)
+#        xminInset = 60 # 0
+#        xmaxInset = 180 # 340 (for full range)
+        xminInset = 40 # 0
+        xmaxInset = 200 # 340 (for full range)
+#        xminInset = 120 # 0
+#        xmaxInset = 251 # 340 (for full range)
 
         if tanb > 0:
             xminInset = mass - 100
@@ -1120,6 +1120,7 @@ class SOBPlotter():
 #        c.Print('figure/Plot_'+fileName+".png")
 #        c.Print('figure/Plot_'+fileName+".pdf")
         c.Print(savepath)
+
         c.Close()
  
 
