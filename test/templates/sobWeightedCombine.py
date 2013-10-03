@@ -55,6 +55,26 @@ class SOBPlotter():
         histNew.SetName(newName)
         return histNew
 
+
+    def HideBin(self, g):
+        
+        blist = []
+
+        for i in range(0, g.GetN()):
+            x = Double(0.)
+            y = Double(0.)
+            g.GetPoint(i, x, y)
+ 
+#            print x, y
+               
+            if x > 100 and x < 150:
+                blist.append(i)
+
+#        print 'Remove list = ', blist
+        for ip in reversed(blist):
+            g.RemovePoint(ip)
+
+
     '''Returns first bin with bin content of at least frac times the maximum'''
     def findFirstBin(self, h, frac=0.1):
         maxVal = h.GetMaximum()
@@ -824,7 +844,7 @@ class SOBPlotter():
         return h
     
     @staticmethod
-    def findMaxY(h, opt=0, lowx=-1., highx=-1.):
+    def findMaxY(h, blind, opt=0, lowx=-1., highx=-1.):
         if lowx == -1.:
             lowx = h.GetXaxis().GetXmin()
         if highx == -1.:
@@ -832,6 +852,13 @@ class SOBPlotter():
 
         maxVal = 0.
         for b in range(1, h.GetNbinsX()+1):
+
+            if blind==False:
+                xval = h.GetXaxis().GetBinCenter(b)
+                if xval > 100 and xval < 150:
+#                    print 'Remove',b
+                    continue
+
             if h.GetBinContent(b) > 0. and lowx < h.GetBinCenter(b) and h.GetBinCenter(b) < highx:
                 if opt == 0:
                     if h.GetBinContent(b) + h.GetBinError(b) > maxVal:
@@ -839,10 +866,18 @@ class SOBPlotter():
                 elif opt == 1:
                     if h.GetBinContent(b) > maxVal:
                         maxVal = h.GetBinContent(b)
+
+#            print 'max, chek point = ', b, maxVal
+
+#        print 'Final value = ', maxVal
+
+        if maxVal==0:
+            maxVal = 0.1
+
         return maxVal
 
 
-    def findMinY(self, h, opt=0, lowx=-1., highx=-1.):
+    def findMinY(self, h, blind, opt=0, lowx=-1., highx=-1.):
         if lowx == -1.:
             lowx = h.GetXaxis().GetXmin()
         if highx == -1.:
@@ -850,8 +885,15 @@ class SOBPlotter():
 
         maxVal = 0.
 
-        maxVal = 0.
         for b in range(1, h.GetNbinsX()+1):
+
+            if blind==False:
+                xval = h.GetXaxis().GetBinCenter(b)
+                if xval > 100 and xval < 150:
+#                    print 'Remove',b
+                    continue
+                
+
             if h.GetBinContent(b) < 0. and lowx < h.GetBinCenter(b) and h.GetBinCenter(b) < highx:
                 if opt == 0:
                     if -h.GetBinContent(b) + h.GetBinError(b) > maxVal:
@@ -859,6 +901,10 @@ class SOBPlotter():
                 elif opt == 1:
                     if -h.GetBinContent(b) > maxVal:
                         maxVal = -h.GetBinContent(b)
+
+#            print 'max, chek point = ', b, maxVal
+
+#        print 'Final value = ', maxVal
         return maxVal
 
 
@@ -1027,6 +1073,7 @@ class SOBPlotter():
             dataDiffGraph = self.diffGraph(dataGraph, ztt, 1)
             errBand=self.getErrorBand(ztt)
 
+
         errBand.SetFillStyle(3013) # 1001=solid , 3004,3005=diagonal, 3013=hatched official for H.tau tau
         errBand.SetFillColor(1)
         errBand.SetLineStyle(1)
@@ -1037,7 +1084,8 @@ class SOBPlotter():
         
 
         errBandFrame.GetYaxis().SetTitle("")
-        errBandFrame.GetYaxis().SetRangeUser(-1.1*self.findMinY(dataDiff,0,xminInset,xmaxInset),2.0*self.findMaxY(dataDiff,0,xminInset,xmaxInset))
+#        errBandFrame.GetYaxis().SetRangeUser(-1.1*self.findMinY(dataDiff,blind,0,xminInset,xmaxInset),2.0*self.findMaxY(dataDiff,blind,0,xminInset,xmaxInset))
+        errBandFrame.GetYaxis().SetRangeUser(-1.1*self.findMinY(dataDiff,blind,0,xminInset,xmaxInset),1.3*self.findMaxY(dataDiff,blind,0,xminInset,xmaxInset))
         errBandFrame.GetYaxis().SetNdivisions(5)
         errBandFrame.GetYaxis().SetLabelSize(0.06)
         errBandFrame.GetXaxis().SetTitle("#bf{m_{#tau#tau} [GeV]}    ")
@@ -1082,7 +1130,13 @@ class SOBPlotter():
         line = TLine()
         line.DrawLine(xminInset, 0, xmaxInset, 0)
         # dataDiff.Draw("pe same")
+
+        if blind==False:
+            self.HideBin(dataDiffGraph)
+
         dataDiffGraph.Draw('pe same')
+
+
         legendDiff.Draw()
         pad.RedrawAxis()
 
@@ -1102,6 +1156,12 @@ class SOBPlotter():
 
         # data.Draw("pe same")
         dataGraph.Draw('PE same')
+
+
+        if blind==False:
+            self.HideBin(dataGraph)
+
+
         print '#####', data.Integral(), data.GetBinContent(1)
         legend.Draw()
         c.RedrawAxis()
