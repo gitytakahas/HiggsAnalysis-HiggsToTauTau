@@ -132,7 +132,7 @@ def main():
 
 
     # Combine
-#    sobCombine('All_SM', list_all, init.get('naming', 'caption'), init.get('naming','all'), categoryname, 1, init.get('muvalue','all'), options.mode, options.unblind)
+    sobCombine('All_SM', list_all, init.get('naming', 'caption'), init.get('naming','all'), categoryname, 1, init.get('muvalue','all'), options.mode, options.unblind)
 
 
 

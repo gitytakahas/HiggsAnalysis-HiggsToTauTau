@@ -937,10 +937,10 @@ class SOBPlotter():
 
 #        xminInset = 60 # 0
 #        xmaxInset = 180 # 340 (for full range)
-        xminInset = 40 # 0
-        xmaxInset = 200 # 340 (for full range)
-#        xminInset = 120 # 0
-#        xmaxInset = 251 # 340 (for full range)
+#        xminInset = 40 # 0
+#        xmaxInset = 200 # 340 (for full range)
+        xminInset = 120 # 0
+        xmaxInset = 251 # 340 (for full range)
 
         if tanb > 0:
             xminInset = mass - 100
