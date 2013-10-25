@@ -17,7 +17,7 @@ parser.add_option("--tanb", dest="tanb", default="8", type="float", help="Tanb o
 parser.add_option("-u", "--uncertainties", dest="uncertainties", default="1", type="int", help="Set uncertainties of backgrounds. [Default: '1']")
 parser.add_option("-o", "--omit", dest="omit", default="0", type="int", help="Do not include uncertainty from original file. [Default: '0']")
 parser.add_option("--asimov", dest="asimov", action="store_true", default=False, help="Use asimov dataset for postfit-plots. [Default: 'False']")
-parser.add_option("--no-0jet-signal", dest="no_zero_jet", action="store_false", default=False, help="Add signal in the 0-jet event category of the mt, et, em channels [Default: False]")
+parser.add_option("--no-0jet-signal", dest="no_zero_jet", action="store_false", default=True, help="Add signal in the 0-jet event category of the mt, et, em channels [Default: False]")
 parser.add_option("--add-mutau-soft", dest="add_mutau_soft", action="store_true", default=False, help="Add the soft categories to the mt channel [Default: False]")
 parser.add_option("--hww-signal", dest="hwwsig", action="store_true", default=False, help="Add H->WW processes as background to the em channel [Default: False]")
 parser.add_option("-v", "--verbose", dest="verbose", action="store_true", default=False, help="Run in verbose more. [Default: 'False']")
